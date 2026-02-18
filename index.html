@@ -3,188 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>魚蝦蟹 DEBUG版 v6.0</title>
+    <title>魚蝦蟹 Pro</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; background: #222; color: white; text-align: center; }
-        .view { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; }
-        .active { display: flex !important; }
+        :root { --red: #d32f2f; --green: #388e3c; --blue: #1976d2; --gold: #fbc02d; }
+        body { font-family: -apple-system, sans-serif; background: #1a1a1a; color: white; margin: 0; text-align: center; }
+        .view { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+        .view.active { display: flex; }
         
-        .btn { padding: 20px 40px; margin: 10px; font-size: 20px; cursor: pointer; border-radius: 10px; border: none; background: white; color: black; font-weight: bold; }
-        .btn:active { background: #ccc; }
+        .btn { padding: 18px 35px; margin: 10px; font-size: 18px; border: none; border-radius: 12px; cursor: pointer; background: #fff; color: #333; font-weight: bold; width: 220px; }
+        .btn-primary { background: var(--red); color: white; }
+        .btn:disabled { background: #666; cursor: not-allowed; }
 
-        /* 賭檯佈局 */
-        .table { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 90%; max-width: 600px; }
-        .cell { background: #006400; border: 2px solid white; padding: 20px 5px; border-radius: 10px; position: relative; }
-        .cell .icon { font-size: 40px; display: block; }
-        .chip { position: absolute; top: -5px; right: -5px; background: gold; color: black; border-radius: 50%; width: 25px; height: 25px; line-height: 25px; font-size: 12px; font-weight: bold; }
+        /* iPad 棋盤 */
+        .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 600px; }
+        .cell { background: white; color: #333; padding: 20px 5px; border-radius: 15px; position: relative; border: 3px solid transparent; }
+        .cell.active { border-color: var(--gold); background: #fffde7; }
+        .cell .icon { font-size: 45px; display: block; }
+        .chip-count { position: absolute; top: -5px; right: -5px; background: var(--gold); border-radius: 50%; width: 30px; height: 30px; line-height: 30px; font-weight: bold; color: black; }
 
-        /* 除錯視窗 */
-        #debug-log { position: fixed; bottom: 0; left: 0; width: 100%; height: 100px; background: rgba(0,0,0,0.8); color: #0f0; font-size: 12px; text-align: left; overflow-y: auto; padding: 5px; pointer-events: none; border-top: 1px solid #444; }
+        /* 骰子 */
+        .dice-container { display: flex; gap: 15px; margin: 20px 0; }
+        .die { width: 70px; height: 70px; background: white; color: #333; border-radius: 12px; font-size: 40px; display: flex; align-items: center; justify-content: center; }
+        .rolling { animation: shake 0.1s infinite; }
+        @keyframes shake { 0% { transform: translate(2px, 2px); } 50% { transform: translate(-2px, -2px); } 100% { transform: translate(2px, -2px); } }
+
+        /* 手機控制 */
+        .shaker-btn { width: 200px; height: 200px; background: var(--red); color: white; border-radius: 50%; font-size: 24px; border: 8px solid white; box-shadow: 0 10px 20px rgba(0,0,0,0.5); font-weight: bold; }
+        input { padding: 15px; font-size: 24px; width: 200px; text-align: center; border-radius: 10px; border: none; margin-bottom: 20px; }
+        #debug-log { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.8); color: #0f0; font-size: 10px; text-align: left; padding: 5px; max-height: 60px; overflow-y: auto; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <div id="debug-log">系統日誌：等待操作...<br></div>
-
     <div id="view-start" class="view active">
-        <h1>🎲 魚蝦蟹 DEBUG v6.0</h1>
-        <p>如果點按鈕沒反應，請檢查下方日誌</p>
-        <button class="btn" onclick="goToHost()">我是 iPad (顯示棋盤)</button>
-        <button class="btn" onclick="goToController()">我是 手機 (當搖盅)</button>
+        <h2>請選擇裝置類型</h2>
+        <button class="btn" onclick="startAsHost()">我是 iPad (桌主)</button>
+        <button class="btn" onclick="startAsController()">我是 手機 (搖盅)</button>
     </div>
 
     <div id="view-host" class="view">
-        <div style="margin-bottom:10px;">連線碼: <b id="peer-id" style="color:gold">等待生成...</b></div>
-        <div id="host-msg">狀態: 準備中</div>
-        <div id="dice-area" style="font-size:40px; margin: 15px;">? ? ?</div>
-        <div class="table" id="main-board"></div>
-        <h2 id="balance-txt">餘額: $5000</h2>
-        <button onclick="location.reload()" style="color:white; background:none; border:1px solid #555;">重新整理</button>
+        <div style="background:var(--gold); color:black; padding:10px 30px; border-radius:30px; margin-bottom:15px; font-weight:bold;">
+            連線碼: <span id="peer-id" style="font-size:24px;">取得中...</span>
+        </div>
+        <div id="host-msg">⌛ 正在等待手機連線...</div>
+        <div class="dice-container">
+            <div id="d1" class="die">?</div><div id="d2" class="die">?</div><div id="d3" class="die">?</div>
+        </div>
+        <div class="board" id="game-board"></div>
+        <h2 style="color:var(--gold)">餘額: $<span id="balance">1000</span></h2>
     </div>
 
     <div id="view-controller" class="view">
-        <input type="number" id="join-id" placeholder="輸入4位碼" style="padding:15px; font-size:20px; width:150px; text-align:center;">
-        <br>
-        <button class="btn" onclick="doConnect()">確認連線</button>
-        <div id="ctrl-active" style="display:none;">
-            <button class="btn" style="background:red; color:white; width:150px; height:150px; border-radius:50%;" onclick="sendRoll()">搖骰！</button>
+        <div id="ctrl-setup">
+            <h2>輸入 iPad 上的連線碼</h2>
+            <input type="number" id="join-id" placeholder="0000" inputmode="numeric">
+            <br>
+            <button class="btn btn-primary" id="connect-btn" onclick="connectToHost()">確認連線</button>
+            <button class="btn" onclick="location.reload()" style="background:transparent; color:white; border:1px solid #666; font-size:14px; width:auto; padding:10px;">返回重新開始</button>
         </div>
-        <br>
-        <button onclick="location.reload()" style="color:white; background:none; border:1px solid #555;">返回</button>
+        <div id="ctrl-active" style="display:none;">
+            <div style="margin-bottom:40px; color:var(--green); font-weight:bold;">✅ 已連線成功！</div>
+            <button class="shaker-btn" id="shake-btn">用力搖或按我！</button>
+            <p style="margin-top:20px; opacity:0.7;">提示：下注完後再搖動</p>
+        </div>
     </div>
 
+    <div id="debug-log">系統日誌準備就緒...</div>
+
 <script>
-    // --- 日誌工具 ---
     function log(msg) {
-        const el = document.getElementById('debug-log');
-        el.innerHTML += "> " + msg + "<br>";
-        el.scrollTop = el.scrollHeight;
         console.log(msg);
+        const logEl = document.getElementById('debug-log');
+        logEl.innerHTML += `<div>> ${msg}</div>`;
+        logEl.scrollTop = logEl.scrollHeight;
     }
 
-    // --- 換頁邏輯 (保證優先執行) ---
+    const symbols = [
+        { name: '魚', icon: '🐟' }, { name: '蝦', icon: '🦐' },
+        { name: '葫蘆', icon: '🍶' }, { name: '金錢', icon: '💰' },
+        { name: '蟹', icon: '🦀' }, { name: '雞', icon: '🐓' }
+    ];
+
+    let peer, conn, balance = 1000, bets = [0,0,0,0,0,0];
+
     function showView(id) {
-        log("嘗試切換到: " + id);
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        const target = document.getElementById(id);
-        if (target) {
-            target.classList.add('active');
-            log("切換成功");
-        } else {
-            log("錯誤: 找不到 ID " + id);
-        }
+        document.getElementById(id).classList.add('active');
     }
 
-    // --- 全域變數 ---
-    const symbols = [{n:'魚',i:'🐟'},{n:'蝦',i:'🦐'},{n:'葫蘆',i:'🍶'},{n:'金錢',i:'💰'},{n:'蟹',i:'🦀'},{n:'雞',i:'🐓'}];
-    let balance = 5000, bets = [0,0,0,0,0,0], peer, conn;
-
-    // --- 按鈕點擊事件 ---
-    function goToHost() {
-        log("點擊了 iPad 按鈕");
+    // --- iPad 邏輯 ---
+    function startAsHost() {
         showView('view-host');
         initBoard();
-        setupPeer();
+        const shortId = Math.floor(1000 + Math.random() * 9000);
+        log(`正在建立主機，ID: ${shortId}`);
+        
+        peer = new Peer('fpc-' + shortId);
+        
+        peer.on('open', id => {
+            document.getElementById('peer-id').innerText = id.replace('fpc-', '');
+            log("主機已在線，等待連線...");
+        });
+
+        peer.on('connection', c => {
+            conn = c;
+            log("手機已連入！");
+            document.getElementById('host-msg').innerHTML = "✅ <span style='color:#4caf50'>手機已連線！請在 iPad 下注並用手機開骰</span>";
+            conn.on('data', data => { if(data === 'ROLL') performRoll(); });
+        });
+
+        peer.on('error', err => log(`錯誤: ${err.type}`));
     }
 
-    function goToController() {
-        log("點擊了手機按鈕");
-        showView('view-controller');
-    }
-
-    // --- iPad 遊戲邏輯 ---
     function initBoard() {
-        const board = document.getElementById('main-board');
+        const board = document.getElementById('game-board');
         board.innerHTML = '';
         symbols.forEach((s, i) => {
             const div = document.createElement('div');
             div.className = 'cell';
-            div.innerHTML = `<span class="icon">${s.i}</span><b>${s.n}</b><div class="chip" id="c-${i}" style="display:none">0</div>`;
-            div.onclick = () => {
-                if (balance >= 100) {
-                    balance -= 100; bets[i] += 100;
-                    document.getElementById('balance-txt').innerText = "餘額: $" + balance;
-                    const c = document.getElementById('c-'+i);
-                    c.innerText = bets[i]; c.style.display = 'block';
-                    log("投注: " + s.n);
-                }
-            };
+            div.innerHTML = `<span class="icon">${s.icon}</span><b>${s.name}</b><div class="chip-count" id="c-${i}" style="display:none">0</div>`;
+            div.onclick = () => { if (balance >= 100) { balance -= 100; bets[i] += 100; updateUI(); } };
             board.appendChild(div);
         });
     }
 
-    function setupPeer() {
-        if (typeof Peer === 'undefined') {
-            log("嚴重錯誤: PeerJS 沒載入，請檢查網速");
-            return;
-        }
-        const sid = Math.floor(1000 + Math.random() * 9000);
-        peer = new Peer('fpc-' + sid);
-        peer.on('open', id => {
-            document.getElementById('peer-id').innerText = id.replace('fpc-', '');
-            log("連線伺服器已就緒，ID: " + id);
+    function updateUI() {
+        document.getElementById('balance').innerText = balance;
+        bets.forEach((amt, i) => {
+            const el = document.getElementById(`c-${i}`);
+            el.innerText = amt;
+            el.style.display = amt > 0 ? 'block' : 'none';
+            el.parentElement.classList.toggle('active', amt > 0);
         });
-        peer.on('connection', c => {
-            conn = c;
-            log("手機已連線！");
-            document.getElementById('host-msg').innerText = "狀態: 手機已連線 ✅";
-            conn.on('data', data => { if(data === 'ROLL') doRoll(); });
-        });
-        peer.on('error', e => log("Peer 錯誤: " + e.type));
     }
 
-    function doRoll() {
-        log("收到開骰指令");
-        if (bets.reduce((a, b) => a + b, 0) === 0) {
-            log("警告: 未下注，拒絕開骰");
-            return;
-        }
-        document.getElementById('dice-area').innerText = "⏳ 搖骰中...";
+    function performRoll() {
+        if (bets.reduce((a, b) => a + b, 0) === 0) return log("未下注，拒絕開骰");
+        log("收到搖骰指令！");
+        const dice = [document.getElementById('d1'), document.getElementById('d2'), document.getElementById('d3')];
+        dice.forEach(d => d.classList.add('rolling'));
+        
         setTimeout(() => {
             const res = [Math.floor(Math.random()*6), Math.floor(Math.random()*6), Math.floor(Math.random()*6)];
-            document.getElementById('dice-area').innerText = symbols[res[0]].i + " " + symbols[res[1]].i + " " + symbols[res[2]].i;
-            
-            let win = 0, back = 0;
-            bets.forEach((bet, i) => {
-                const matches = res.filter(r => r === i).length;
-                if (matches > 0) { win += bet * matches; back += bet; }
+            dice.forEach((d, i) => {
+                d.classList.remove('rolling');
+                d.innerText = symbols[res[i]].icon;
             });
-            balance += (win + back);
-            bets = [0,0,0,0,0,0];
-            document.getElementById('balance-txt').innerText = "餘額: $" + balance;
-            document.querySelectorAll('.chip').forEach(c => c.style.display = 'none');
-            log("開獎結束，贏得: $" + win);
-            alert(win > 0 ? "🎉 贏了 $" + win : "沒中獎！");
-        }, 1000);
+            calculateWin(res);
+        }, 1200);
+    }
+
+    function calculateWin(results) {
+        let win = 0, back = 0;
+        bets.forEach((bet, i) => {
+            const matches = results.filter(r => r === i).length;
+            if (matches > 0) { win += bet * matches; back += bet; }
+        });
+        balance += (win + back);
+        bets = [0,0,0,0,0,0];
+        setTimeout(() => { updateUI(); if(win>0) alert(`贏了 $${win}！`); }, 500);
     }
 
     // --- 手機邏輯 ---
-    function doConnect() {
-        const id = document.getElementById('join-id').value;
-        if (!id) return;
-        log("嘗試連線到: " + id);
+    function startAsController() {
+        showView('view-controller');
+        log("切換到手機模式");
+    }
+
+    async function connectToHost() {
+        const inputId = document.getElementById('join-id').value;
+        if (!inputId) return alert("請輸入連線碼");
+
+        const connectBtn = document.getElementById('connect-btn');
+        connectBtn.disabled = true;
+        connectBtn.innerText = "連線中...";
+        log(`嘗試連線到主機: ${inputId}`);
+
+        // iOS 搖晃權限
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            try { await DeviceMotionEvent.requestPermission(); } catch(e) { log("權限被拒絕"); }
+        }
+
+        if (peer) peer.destroy(); // 確保舊連線已清除
         peer = new Peer();
+        
         peer.on('open', () => {
-            conn = peer.connect('fpc-' + id);
+            conn = peer.connect('fpc-' + inputId);
+            
+            // 設置超時檢測
+            const timeout = setTimeout(() => {
+                if (!conn.open) {
+                    log("連線超時，請檢查連線碼是否正確");
+                    connectBtn.disabled = false;
+                    connectBtn.innerText = "重試連線";
+                }
+            }, 8000);
+
             conn.on('open', () => {
-                log("連線成功！");
+                clearTimeout(timeout);
+                log("成功連接到 iPad！");
                 document.getElementById('ctrl-setup').style.display = 'none';
                 document.getElementById('ctrl-active').style.display = 'block';
+                setupShaker();
             });
-            conn.on('error', e => log("連線失敗: " + e));
+
+            conn.on('error', err => {
+                log(`連線出錯: ${err}`);
+                connectBtn.disabled = false;
+                connectBtn.innerText = "確認連線";
+            });
         });
     }
 
-    function sendRoll() {
-        if(conn) {
-            log("發送開骰請求...");
+    function setupShaker() {
+        const btn = document.getElementById('shake-btn');
+        let canRoll = true;
+        const trigger = () => {
+            if (!canRoll) return;
             conn.send('ROLL');
-        }
-    }
+            log("發送開骰指令");
+            btn.style.transform = "scale(0.9)";
+            canRoll = false;
+            setTimeout(() => { btn.style.transform = "scale(1)"; canRoll = true; }, 2000);
+        };
+        btn.onclick = trigger;
 
-    // 啟動確認
-    log("App 已啟動，等待點擊...");
+        window.addEventListener('devicemotion', e => {
+            let acc = e.accelerationIncludingGravity;
+            if (Math.abs(acc.x) + Math.abs(acc.y) > 25) trigger();
+        });
+    }
 </script>
 </body>
 </html>
